@@ -84,20 +84,24 @@ if model:
                     st.markdown(bai_viet)
                     st.markdown("---")
 
-                # --- BƯỚC 2: TẠO HÌNH ẢNH ---
-                st.subheader("🖼️ HÌNH ẢNH ĐĂNG BÀI (AI Tạo)")
-                if OPENAI_API_KEY:
-                    with st.spinner('AI đang tạo hình ảnh...'):
-                        # AI sẽ tạo prompt ảnh từ chính bài viết hoặc từ topic
-                        image_prompt_text = f"Một hình ảnh quảng cáo độc đáo, chất lượng cao cho sản phẩm/dịch vụ: {topic}. Phong cách hiện đại, thu hút. Tập trung vào lợi ích khách hàng."
-                        image_url = generate_image_with_dalle(image_prompt_text)
-                        if image_url:
-                            st.image(image_url, caption="Hình ảnh được tạo bởi AI (DALL-E 3)", use_column_width=True)
-                        else:
-                            st.warning("Không thể tạo hình ảnh. Vui lòng kiểm tra DALL_E_KEY hoặc thử lại.")
-                else:
-                    st.info("Tính năng tạo hình ảnh yêu cầu DALL_E_KEY trong Streamlit Secrets.")
-                st.markdown("---")
+               def generate_image_with_dalle(prompt_text):
+    if not OPENAI_API_KEY:
+        return None
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {"model": "dall-e-3", "prompt": prompt_text, "n": 1, "size": "1024x1024"}
+    
+    try:
+        response = requests.post("https://api.openai.com/v1/images/generations", headers=headers, json=data, timeout=30)
+        if response.status_code == 200:
+            return response.json()["data"][0]["url"]
+        else:
+            # Nếu hết tiền hoặc lỗi, trả về None chứ không báo lỗi đỏ 
+            return None
+    except:
+        return None
 
 
                 # --- BƯỚC 3: KIỂM TRA VI PHẠM (POLICY) ---
@@ -113,3 +117,4 @@ if model:
             st.warning("Vui lòng nhập thông tin sản phẩm!")
 else:
     st.error("Không thể kết nối với bất kỳ Model AI nào. Hãy kiểm tra lại API Key Gemini.")
+
