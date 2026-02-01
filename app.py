@@ -6,7 +6,7 @@ from PIL import Image
 try:
     API_KEY = st.secrets["GEMINI_KEY"]
     genai.configure(api_key=API_KEY)
-    model = genai.GenerativeModel('gemini-1.5-flash')
+    model = genai.GenerativeModel('models/gemini-1.5-flash-latest')
 except:
     st.error("Lỗi: Chưa cấu hình API Key trong mục Secrets!")
 
@@ -29,5 +29,6 @@ elif menu == "Kiểm Duyệt Ảnh Ads":
         img = Image.open(file)
         response = model.generate_content(["Kiểm tra xem ảnh này có vi phạm chính sách Facebook (hở hang, bạo lực, súng ống) không?", img])
         st.info(response.text)
+
 
 
