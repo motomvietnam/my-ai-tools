@@ -2,7 +2,7 @@ import streamlit as st
 import google.generativeai as genai
 
 st.set_page_config(page_title="AI Marketing Tool", layout="centered")
-st.title("🚀 TỰ ĐỘNG VIẾT CONTENT ĐĂNG BÀI")
+st.title("🚀 AUTO VIẾT CONTENT ĐĂNG BÀI")
 
 # 1. Cấu hình API từ Secrets
 if "GEMINI_KEY" not in st.secrets:
@@ -52,4 +52,5 @@ if model:
             st.warning("Vui lòng nhập thông tin sản phẩm!")
 else:
     st.error("Không thể kết nối với bất kỳ Model AI nào. Hãy kiểm tra lại API Key.")
+
 
