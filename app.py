@@ -29,5 +29,5 @@ elif menu == "Kiểm Duyệt Ảnh Ads":
         img = Image.open(file)
         response = model.generate_content(["Kiểm tra xem ảnh này có vi phạm chính sách Facebook (hở hang, bạo lực, súng ống) không?", img])
         st.info(response.text)
-________________________________________
+
 
