@@ -1,54 +1,115 @@
 import streamlit as st
 import google.generativeai as genai
+import requests # Thư viện để gọi API tạo ảnh
+import json # Để xử lý JSON
 
-st.set_page_config(page_title="AUTO CONTENT AI", layout="wide")
+st.set_page_config(page_title="AUTO CONTENT AI", layout="centered")
+st.title("🚀 AUTO VIẾT CONTENT ĐĂNG BÀI")
 
-# 1. Cấu hình API
+# 1. Cấu hình API từ Secrets
 if "GEMINI_KEY" not in st.secrets:
-    st.error("Lỗi: Bạn chưa cấu hình GEMINI_KEY trong Secrets!")
+    st.error("Lỗi: Bạn chưa dán API Key Gemini vào mục Secrets của Streamlit!")
     st.stop()
 
 genai.configure(api_key=st.secrets["GEMINI_KEY"])
 
-# 2. Khởi tạo Model (Cố định bản Flash để tránh lỗi 404)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# 2. Khởi tạo API Key DALL-E (Cho tính năng tạo hình ảnh)
+# Bạn CẦN TẠO một SECRET mới tên là DALL_E_KEY = "sk-..."
+OPENAI_API_KEY = st.secrets.get("DALL_E_KEY") 
+if not OPENAI_API_KEY:
+    st.warning("⚠️ Để TẠO HÌNH ẢNH, vui lòng thêm DALL_E_KEY (OpenAI API Key) vào Streamlit Secrets.")
 
-# 3. Hàm kiểm tra vi phạm Facebook
-def check_policy(content):
-    prompt = f"Phân tích các lỗi vi phạm chính sách quảng cáo Facebook (như cam kết quá mức, trị dứt điểm, từ ngữ bị cấm, nhạy cảm) cho nội dung sau: {content}"
+# 3. Hàm tự động tìm Model khả dụng (Giữ nguyên từ code gốc của bạn)
+@st.cache_resource
+def find_working_model():
+    test_names = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
     try:
-        response = model.generate_content(prompt)
-        return response.text
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        if available_models:
+            for name in test_names:
+                full_name = f"models/{name}"
+                if full_name in available_models or name in available_models:
+                    return genai.GenerativeModel(name)
+            return genai.GenerativeModel(available_models[0])
     except:
-        return "Không thể kiểm tra chính sách lúc này."
+        return genai.GenerativeModel('gemini-pro')
+    return None
 
-# 4. Giao diện
-st.title("🚀 AUTO CONTENT AI PRO")
-st.subheader("Hệ thống viết bài & Kiểm tra vi phạm Facebook")
+model = find_working_model()
 
-topic = st.text_area("Nhập sản phẩm/dịch vụ của bạn:", placeholder="Ví dụ: Giày thể thao nam cao cấp...")
+# --- Hàm Tạo Hình ảnh bằng DALL-E 3 ---
+def generate_image_with_dalle(prompt_text):
+    if not OPENAI_API_KEY:
+        st.error("Không tìm thấy DALL_E_KEY. Vui lòng thêm vào Streamlit Secrets để tạo ảnh.")
+        return None
 
-if st.button("Tạo Nội Dung & Check Policy"):
-    if topic:
-        col1, col2 = st.columns(2)
-        
-        with st.spinner('Đang xử lý...'):
-            # Bước 1: Tạo bài viết
-            res_content = model.generate_content(f"Viết bài quảng cáo Facebook hấp dẫn cho: {topic}")
-            article = res_content.text
-            
-            with col1:
-                st.success("📝 BÀI VIẾT QUẢNG CÁO")
-                st.write(article)
-                st.button("Sao chép bài viết", on_click=lambda: st.write("Đã sao chép!")) # Giả lập
+    headers = {
+        "Authorization": f"Bearer {OPENAI_API_KEY}",
+        "Content-Type": "application/json"
+    }
+    data = {
+        "model": "dall-e-3",
+        "prompt": prompt_text,
+        "n": 1,
+        "size": "1024x1024" 
+    }
+    
+    try:
+        response = requests.post("https://api.openai.com/v1/images/generations", headers=headers, json=data)
+        response.raise_for_status() # Báo lỗi nếu status code không phải 200
+        image_url = response.json()["data"][0]["url"]
+        return image_url
+    except requests.exceptions.RequestException as e:
+        st.error(f"Lỗi khi gọi API DALL-E: {e}")
+        try:
+            st.json(response.json()) # In ra chi tiết lỗi từ API nếu có
+        except:
+            pass
+        return None
 
-            # Bước 2: Check Policy
-            with col2:
-                st.warning("🛡️ KIỂM TRA VI PHẠM (POLICY)")
-                policy_feedback = check_policy(article)
-                st.write(policy_feedback)
-                
-            st.divider()
-            st.info("💡 Mẹo: Bạn nên dùng hình ảnh thực tế của sản phẩm để tăng tỷ lệ chuyển đổi!")
-    else:
-        st.warning("Vui lòng nhập thông tin sản phẩm!")
+# 4. Giao diện người dùng
+if model:
+    topic = st.text_area("Sản phẩm của bạn là gì?", placeholder="Ví dụ: Mỹ phẩm trị mụn, Khóa học đầu tư...")
+    
+    if st.button("Tạo bài viết & Hình ảnh & Kiểm tra Policy"):
+        if topic:
+            try:
+                # --- BƯỚC 1: TẠO NỘI DUNG ---
+                with st.spinner('Hệ thống đang viết bài quảng cáo...'):
+                    prompt_content = f"Viết bài quảng cáo Facebook hấp dẫn, sử dụng emoji, tối ưu chuyển đổi về: {topic}"
+                    response_content = model.generate_content(prompt_content)
+                    bai_viet = response_content.text
+                    
+                    st.success("✅ ĐÃ TẠO BÀI VIẾT")
+                    st.markdown(bai_viet)
+                    st.markdown("---")
+
+                # --- BƯỚC 2: TẠO HÌNH ẢNH ---
+                st.subheader("🖼️ HÌNH ẢNH ĐĂNG BÀI (AI Tạo)")
+                if OPENAI_API_KEY:
+                    with st.spinner('AI đang tạo hình ảnh...'):
+                        # AI sẽ tạo prompt ảnh từ chính bài viết hoặc từ topic
+                        image_prompt_text = f"Một hình ảnh quảng cáo độc đáo, chất lượng cao cho sản phẩm/dịch vụ: {topic}. Phong cách hiện đại, thu hút. Tập trung vào lợi ích khách hàng."
+                        image_url = generate_image_with_dalle(image_prompt_text)
+                        if image_url:
+                            st.image(image_url, caption="Hình ảnh được tạo bởi AI (DALL-E 3)", use_column_width=True)
+                        else:
+                            st.warning("Không thể tạo hình ảnh. Vui lòng kiểm tra DALL_E_KEY hoặc thử lại.")
+                else:
+                    st.info("Tính năng tạo hình ảnh yêu cầu DALL_E_KEY trong Streamlit Secrets.")
+                st.markdown("---")
+
+
+                # --- BƯỚC 3: KIỂM TRA VI PHẠM (POLICY) ---
+                st.subheader("🛡️ KIỂM TRA VI PHẠM CHÍNH SÁCH FB")
+                with st.spinner('AI đang phân tích vi phạm...'):
+                    prompt_policy = f"Phân tích bài viết sau xem có vi phạm chính sách quảng cáo Facebook không (các từ khóa bị cấm, cam kết quá mức, từ nhạy cảm về cơ thể, y tế...): {bai_viet}"
+                    policy_response = model.generate_content(prompt_policy)
+                    st.info(policy_feedback := policy_response.text)
+
+            except Exception as e:
+                st.error(f"Lỗi khi xử lý: {e}")
+        else:
+            st.warning("Vui lòng nhập thông tin sản phẩm!")
+else:
+    st.error("Không thể kết nối với bất kỳ Model AI nào. Hãy kiểm tra lại API Key Gemini.")
