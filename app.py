@@ -12,27 +12,21 @@ if "GEMINI_KEY" not in st.secrets:
     st.error("Lỗi: Chưa dán API Key vào mục Secrets của Streamlit!")
     st.stop()
 
+# Cấu hình API Google Gemini
+if "GEMINI_KEY" not in st.secrets:
+    st.error("Lỗi: Chưa dán API Key vào mục Secrets!")
+    st.stop()
+
 genai.configure(api_key=st.secrets["GEMINI_KEY"])
 
-# 2. Hàm tự động tìm Model khả dụng (đã bao gồm giải quyết lỗi 404)
-@st.cache_resource
-def find_working_model():
-    try:
-        # Lấy danh sách tất cả model mà API Key của bạn được phép dùng
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        
-        # Ưu tiên Gemini 1.5 Flash cho tốc độ và chi phí
-        if 'models/gemini-1.5-flash' in available_models:
-            return genai.GenerativeModel('gemini-1.5-flash')
-        elif 'gemini-1.5-flash' in available_models: # Đôi khi không có tiền tố 'models/'
-            return genai.GenerativeModel('gemini-1.5-flash')
-        elif 'models/gemini-pro' in available_models:
-            return genai.GenerativeModel('gemini-pro')
-        elif 'gemini-pro' in available_models:
-            return genai.GenerativeModel('gemini-pro')
-        
-    except Exception as e:
-        st.error(f"Lỗi khi liệt kê model từ Google: {e}")
+# Cố định model để tránh lỗi kết nối
+try:
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    # Thử kết nối nhẹ để kiểm tra
+    model.generate_content("test", generation_config={"max_output_tokens": 1})
+except Exception as e:
+    st.error(f"Lỗi kết nối API: {e}")
+    st.stop()
     return None
 
 model = find_working_model()
@@ -144,3 +138,4 @@ if model:
             st.warning("Vui lòng nhập thông tin sản phẩm/dịch vụ!")
 else:
     st.error("Không thể kết nối với Model AI. Vui lòng kiểm tra lại API Key Gemini của bạn.")
+
