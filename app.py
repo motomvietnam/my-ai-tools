@@ -1,4 +1,3 @@
-Python
 import streamlit as st
 import google.generativeai as genai
 from PIL import Image
@@ -31,3 +30,4 @@ elif menu == "Kiểm Duyệt Ảnh Ads":
         response = model.generate_content(["Kiểm tra xem ảnh này có vi phạm chính sách Facebook (hở hang, bạo lực, súng ống) không?", img])
         st.info(response.text)
 ________________________________________
+
